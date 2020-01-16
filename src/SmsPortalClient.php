@@ -34,19 +34,29 @@ class SmsPortalClient
     /**
      * @var string
      */
-    protected $apiSecret;
+    protected $apiClientSecret;
 
     /**
      * @var string
      */
     protected $apiToken;
 
-    public function __construct(string $baseRestUri, string $apiClientId, string $apiSecret)
+    public function __construct(string $apiClientId = nul, string $apiClientSecret = null)
     {
         $this->client = new Client;
-        $this->baseRestUri = $baseRestUri;
+        $this->baseRestUri = 'https://rest.smsportal.com/v1/';
         $this->apiClientId = $apiClientId;
-        $this->apiSecret = $apiSecret;
+        $this->apiClientSecret = $apiClientSecret;
+    }
+
+    public function setApiClientId($apiClientId)
+    {
+        $this->apiClientId = $apiClientId;
+    }
+
+    public function setApiClientSecret($apiClientSecret)
+    {
+        $this->apiClientSecret = $apiClientSecret;
     }
 
     /**
@@ -60,7 +70,7 @@ class SmsPortalClient
     {
         $response = $this->client->request(static::HTTP_GET, $this->baseRestUri . 'Authentication', [
             'http_errors' => false,
-            'headers' => ['Authorization' => 'Basic ' . base64_encode($this->apiClientId . ':' . $this->apiSecret)]
+            'headers' => ['Authorization' => 'Basic ' . base64_encode($this->apiClientId . ':' . $this->apiClientSecret)]
         ]);
         $responseData = $this->getResponse((string) $response->getBody());
         $this->apiToken = $responseData['token'];
@@ -71,47 +81,75 @@ class SmsPortalClient
      * @param $to
      * @param $message
      * @param string|null $from
-     * todo: reportUrl, etc
-     *
+     * @param bool $shortenUrls - https://docs.smsportal.com/docs/url-shortening
      * @return mixed
      * @throws \Exception
      */
     public function sendMessage(
         $to,
         $message,
-        $from = null
+        $from = null,
+        $reportUrl = null,
+        $shortenUrls = false
     ) {
-        return $this->sendRequest([
+        $request = [
             'messages' => [
                 [
                     'destination' => $to,
                     'content' => $message,
                 ]
             ]
-        ]);
+        ];
+
+        $sendOptions = [];
+
+        if ($from) {
+            $sendOptions['senderId'] = $from;
+        }
+
+        if ($shortenUrls) {
+            $sendOptions['shortenUrls'] = true;
+        }
+
+        if (count($sendOptions) > 0) {
+            $request['SendOptions'] = $sendOptions;
+        }
+
+        echo "REQUEST: \n";
+        echo json_encode($request);
+        echo "\n\n";
+
+        return $this->sendRequest($request);
     }
 
     /**
      * Submit API request to send SMS
      *
      * @link https://docs.smsportal.com/reference#bulkmessages
-     * @param array $options
+     * @param array $request
      * @return array
      * @throws \Exception
      */
-    protected function sendRequest(array $options)
+    protected function sendRequest(array $request)
     {
         $response = $this->authorize()->client->request(static::HTTP_POST, $this->baseRestUri . 'BulkMessages', [
-            'json' => $options,
+            'json' => $request,
             'http_errors' => false,
             'headers' => ['Authorization' => 'Bearer ' . $this->apiToken]
         ]);
 
+        echo "token={$this->apiToken}";
+
         $response = $this->getResponse((string) $response->getBody());
 
-        if (isset($response['errors'])) {
-            echo 'errors is set...';
-            $errorMessage = $response['errors'][0]['errorMessage'] ?? 'Error sending SMS';
+        if (isset($response['statusCode']) && $response['statusCode'] !== 200) {
+            $errorMessage = 'Error sending SMS message';
+            if (isset($response['errors'])) {
+                $errorMessage = json_encode($response['errors']);
+            } elseif (isset($response['ErrorReport']['Faults'])) {
+                $errorMessage = json_encode($response['ErrorReport']['Faults']);
+            }
+
             throw new \Exception($errorMessage);
         }
 
