@@ -115,10 +115,6 @@ class SmsPortalClient
             $request['SendOptions'] = $sendOptions;
         }
 
-        echo "REQUEST: \n";
-        echo json_encode($request);
-        echo "\n\n";
-
         return $this->sendRequest($request);
     }
 
