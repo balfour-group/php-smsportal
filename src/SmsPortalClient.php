@@ -41,7 +41,7 @@ class SmsPortalClient
      */
     protected $apiToken;
 
-    public function __construct(string $apiClientId = nul, string $apiClientSecret = null)
+    public function __construct(string $apiClientId = null, string $apiClientSecret = null)
     {
         $this->client = new Client;
         $this->baseRestUri = 'https://rest.smsportal.com/v1/';
@@ -111,6 +111,10 @@ class SmsPortalClient
             $sendOptions['shortenUrls'] = true;
         }
 
+        if ($reportUrl) {
+            $sendOptions['report_url']
+        }
+
         if (count($sendOptions) > 0) {
             $request['SendOptions'] = $sendOptions;
         }
@@ -133,8 +137,6 @@ class SmsPortalClient
             'http_errors' => false,
             'headers' => ['Authorization' => 'Bearer ' . $this->apiToken]
         ]);
-
-        echo "token={$this->apiToken}";
 
         $response = $this->getResponse((string) $response->getBody());
 
