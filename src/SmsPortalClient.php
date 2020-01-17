@@ -112,7 +112,7 @@ class SmsPortalClient
         }
 
         if ($reportUrl) {
-            $sendOptions['report_url']
+            $sendOptions['report_url'];
         }
 
         if (count($sendOptions) > 0) {
