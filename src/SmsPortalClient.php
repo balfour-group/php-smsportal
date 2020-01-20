@@ -81,16 +81,13 @@ class SmsPortalClient
      * @param $to
      * @param $message
      * @param string|null $from
-     * @param bool $shortenUrls - https://docs.smsportal.com/docs/url-shortening
      * @return mixed
      * @throws \Exception
      */
     public function sendMessage(
         $to,
         $message,
-        $from = null,
-        $reportUrl = null,
-        $shortenUrls = false
+        $from = null
     ) {
         $request = [
             'messages' => [
@@ -105,14 +102,6 @@ class SmsPortalClient
 
         if ($from) {
             $sendOptions['senderId'] = $from;
-        }
-
-        if ($shortenUrls) {
-            $sendOptions['shortenUrls'] = true;
-        }
-
-        if ($reportUrl) {
-            $sendOptions['report_url'];
         }
 
         if (count($sendOptions) > 0) {
