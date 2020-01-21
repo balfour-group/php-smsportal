@@ -15,10 +15,8 @@ class SmsPortalClientTest extends TestCase
         );
 
         $resp = $client->sendMessage(
-            '0610624165',
-            'This is my message http://masterstart.com',
-            null,
-            //todo: input ngrok url here
+            '+27610624166',
+            'Hello this is my message'
         );
 
         echo json_encode($resp);
