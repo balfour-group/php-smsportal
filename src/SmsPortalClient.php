@@ -177,7 +177,7 @@ class SmsPortalClient
      * @link https://docs.smsportal.com/reference#bulkmessages
      * @param array $request
      * @return array
-     * @throws \Exception
+     * @throws Exception
      */
     protected function sendRequest(array $request)
     {
