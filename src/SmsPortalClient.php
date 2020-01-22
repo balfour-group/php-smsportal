@@ -85,7 +85,7 @@ class SmsPortalClient
     }
 
     /**
-     * Get the API client id
+     * Return the API client id
      *
      * @return string
      */
@@ -105,7 +105,7 @@ class SmsPortalClient
     }
 
     /**
-     * Get the API client secret
+     * Return the API client secret
      *
      * @return string
      */
@@ -115,7 +115,7 @@ class SmsPortalClient
     }
 
     /**
-     * Sets the API token
+     * Authorizes and sets the API token
      * https://docs.smsportal.com/reference#authentication
      *
      * @return SmsPortalClient
