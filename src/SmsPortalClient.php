@@ -2,6 +2,7 @@
 
 namespace Balfour\SmsPortal;
 
+use Exception;
 use GuzzleHttp\Client;
 
 class SmsPortalClient
@@ -41,6 +42,10 @@ class SmsPortalClient
      */
     protected $apiToken;
 
+    /**
+     * @param string $apiClientId
+     * @param string $apiClientSecret
+     */
     public function __construct(string $apiClientId = null, string $apiClientSecret = null)
     {
         $this->client = new Client;
@@ -49,42 +54,72 @@ class SmsPortalClient
         $this->apiClientSecret = $apiClientSecret;
     }
 
-    public function setBaseRestUri($baseRestUri)
+    /**
+     * Set the base REST Uri
+     *
+     * @param string $baseRestUri
+     */
+    public function setBaseRestUri(string $baseRestUri)
     {
         $this->baseRestUri = $baseRestUri;
     }
 
+    /**
+     * Return base REST Uri
+     *
+     * @return string
+     */
     public function getBaseRestUri()
     {
         return $this->baseRestUri;
     }
 
-    public function setApiClientId($apiClientId)
+    /**
+     * Set the API client id
+     *
+     * @param string $apiClientId
+     */
+    public function setApiClientId(string $apiClientId)
     {
         $this->apiClientId = $apiClientId;
     }
 
+    /**
+     * Get the API client id
+     *
+     * @return string
+     */
     public function getApiClientId()
     {
         return $this->apiClientId;
     }
 
-    public function setApiClientSecret($apiClientSecret)
+    /**
+     * Set the API client secret
+     *
+     * @param string $apiClientSecret
+     */
+    public function setApiClientSecret(string $apiClientSecret)
     {
         $this->apiClientSecret = $apiClientSecret;
     }
 
+    /**
+     * Get the API client secret
+     *
+     * @return string
+     */
     public function getApiClientSecret()
     {
         return $this->apiClientSecret;
     }
 
     /**
-     * get apiToken
-     *
+     * Sets the API token
      * https://docs.smsportal.com/reference#authentication
+     *
      * @return SmsPortalClient
-     * @throws \Exception
+     * @throws Exception
      */
     public function authorize()
     {
@@ -92,17 +127,22 @@ class SmsPortalClient
             'http_errors' => false,
             'headers' => ['Authorization' => 'Basic ' . base64_encode($this->apiClientId . ':' . $this->apiClientSecret)]
         ]);
+
         $responseData = $this->getResponse((string) $response->getBody());
+
         $this->apiToken = $responseData['token'];
+
         return $this;
     }
 
     /**
-     * @param $to
-     * @param $message
+     * Send an SMS
+     *
+     * @param string $to
+     * @param string $message
      * @param string|null $from
      * @return mixed
-     * @throws \Exception
+     * @throws Exception
      */
     public function sendMessage(
         $to,
