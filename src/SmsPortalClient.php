@@ -49,14 +49,34 @@ class SmsPortalClient
         $this->apiClientSecret = $apiClientSecret;
     }
 
+    public function setBaseRestUri($baseRestUri)
+    {
+        $this->baseRestUri = $baseRestUri;
+    }
+
+    public function getBaseRestUri()
+    {
+        return $this->baseRestUri;
+    }
+
     public function setApiClientId($apiClientId)
     {
         $this->apiClientId = $apiClientId;
     }
 
+    public function getApiClientId()
+    {
+        return $this->apiClientId;
+    }
+
     public function setApiClientSecret($apiClientSecret)
     {
         $this->apiClientSecret = $apiClientSecret;
+    }
+
+    public function getApiClientSecret()
+    {
+        return $this->apiClientSecret;
     }
 
     /**
