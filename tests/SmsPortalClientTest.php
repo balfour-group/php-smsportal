@@ -3,7 +3,6 @@
 namespace Tests;
 
 use Balfour\SmsPortal\SmsPortalClient;
-use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class SmsPortalClientTest extends TestCase
@@ -54,7 +53,5 @@ class SmsPortalClientTest extends TestCase
         );
 
         $this->assertEquals(1, $resp['cost']);
-
-        //echo print_r($resp, true);
     }
 }
