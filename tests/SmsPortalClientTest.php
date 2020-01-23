@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Balfour\SmsPortal\SmsPortalClient;
+use GuzzleHttp\Client;
 use PHPUnit\Framework\TestCase;
 
 class SmsPortalClientTest extends TestCase
@@ -10,17 +11,19 @@ class SmsPortalClientTest extends TestCase
     public function testSetBaseRestUri()
     {
         $client = new SmsPortalClient(
+            new Client,
             'api_client_id',
             'api_client_secret'
         );
-        $this->assertEquals('https://rest.smsportal.com/v1/', $client->getBaseRestUri());
-        $client->setBaseRestUri('new_base_rest_uri');
-        $this->assertEquals('new_base_rest_uri', $client->getBaseRestUri());
+        $this->assertEquals('https://rest.smsportal.com/v1/', $client->getUri());
+        $client->setUri('new_base_rest_uri');
+        $this->assertEquals('new_base_rest_uri', $client->getUri());
     }
 
     public function testSetApiClientId()
     {
         $client = new SmsPortalClient(
+            new Client,
             'api_client_id',
             'api_client_secret'
         );
@@ -32,6 +35,7 @@ class SmsPortalClientTest extends TestCase
     public function testSetApiClientSecret()
     {
         $client = new SmsPortalClient(
+            new Client,
             'api_client_id',
             'api_client_secret'
         );
@@ -43,12 +47,13 @@ class SmsPortalClientTest extends TestCase
     public function testSendMessage()
     {
         $client = new SmsPortalClient(
+            new Client,
             '8f272f09-7cd6-4c0a-b352-1513f7491764',
             '47CHNduGxoDKslW1opwFDwqGBFBPrCqL'
         );
 
         $resp = $client->sendMessage(
-            '+27000000000',
+            '+27610624165',
             'Hello this is my message'
         );
 

@@ -4,6 +4,7 @@ namespace Balfour\SmsPortal;
 
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Request;
 
 class SmsPortalClient
 {
@@ -25,7 +26,7 @@ class SmsPortalClient
     /**
      * @var string
      */
-    protected $baseRestUri;
+    protected $uri;
 
     /**
      * @var string
@@ -43,13 +44,14 @@ class SmsPortalClient
     protected $apiToken;
 
     /**
-     * @param string $apiClientId
-     * @param string $apiClientSecret
+     * @param Client $client
+     * @param string|null $apiClientId
+     * @param string|null $apiClientSecret
      */
-    public function __construct(string $apiClientId = null, string $apiClientSecret = null)
+    public function __construct(Client $client, ?string $apiClientId = null, ?string $apiClientSecret = null)
     {
-        $this->client = new Client;
-        $this->baseRestUri = 'https://rest.smsportal.com/v1/';
+        $this->client = $client;
+        $this->uri = 'https://rest.smsportal.com/v1/';
         $this->apiClientId = $apiClientId;
         $this->apiClientSecret = $apiClientSecret;
     }
@@ -57,11 +59,11 @@ class SmsPortalClient
     /**
      * Set the base REST Uri
      *
-     * @param string $baseRestUri
+     * @param string $uri
      */
-    public function setBaseRestUri(string $baseRestUri)
+    public function setUri(string $uri)
     {
-        $this->baseRestUri = $baseRestUri;
+        $this->uri = $uri;
     }
 
     /**
@@ -69,13 +71,13 @@ class SmsPortalClient
      *
      * @return string
      */
-    public function getBaseRestUri()
+    public function getUri()
     {
-        return $this->baseRestUri;
+        return $this->uri;
     }
 
     /**
-     * Set the API client id
+     * Set the api client id
      *
      * @param string $apiClientId
      */
@@ -85,7 +87,7 @@ class SmsPortalClient
     }
 
     /**
-     * Return the API client id
+     * Return the api client id
      *
      * @return string
      */
@@ -95,7 +97,7 @@ class SmsPortalClient
     }
 
     /**
-     * Set the API client secret
+     * Set the api client secret
      *
      * @param string $apiClientSecret
      */
@@ -105,7 +107,7 @@ class SmsPortalClient
     }
 
     /**
-     * Return the API client secret
+     * Return the api client secret
      *
      * @return string
      */
@@ -115,22 +117,87 @@ class SmsPortalClient
     }
 
     /**
-     * Authorizes and sets the API token
-     * https://docs.smsportal.com/reference#authentication
-     *
-     * @return SmsPortalClient
+     * @param string $endpoint
+     * @param array $params
+     * @return string
+     */
+    protected function getBaseUri($endpoint, array $params = [])
+    {
+        $uri = $this->uri;
+        $uri = rtrim($uri, '/');
+        $uri .=  '/' . ltrim($endpoint, '/');
+
+        if (!empty($params)) {
+            $uri .= '?' . http_build_query($params);
+        }
+
+        return $uri;
+    }
+
+    /**
+     * @param string $endpoint
+     * @param array $params
+     * @param array $headers
+     * @return array
+     */
+    public function get($endpoint, array $params = [], $headers = [])
+    {
+        $request = new Request(
+            'GET',
+            $this->getBaseUri($endpoint, $params),
+            $headers
+        );
+
+        return $this->sendRequest($request);
+    }
+
+    /**
+     * @param string $endpoint
+     * @param array $payload
+     * @param array $headers
+     * @return array
      * @throws Exception
      */
+    public function post($endpoint, array $payload = [])
+    {
+        if ($this->apiToken === null) {
+            echo 'doing authorize()';
+            $this->authorize();
+        }
+
+        $request = new Request(
+            'POST',
+            $this->getBaseUri($endpoint),
+            ['Authorization' => 'Bearer ' . $this->apiToken]
+        );
+
+        return $this->sendRequest($request, ['json' => $payload]);
+    }
+
+    protected function sendRequest(Request $request, $options = [])
+    {
+        $response = $this->client->send($request, $options);
+        $body = (string) $response->getBody();
+
+        return json_decode($body, true);
+    }
+
     public function authorize()
     {
-        $response = $this->client->request(static::HTTP_GET, $this->baseRestUri . 'Authentication', [
-            'http_errors' => false,
-            'headers' => ['Authorization' => 'Basic ' . base64_encode($this->apiClientId . ':' . $this->apiClientSecret)]
-        ]);
+        $headers = ['Authorization' => 'Basic ' . base64_encode($this->apiClientId . ':' . $this->apiClientSecret)];
+        $response = $this->get('Authentication', [], $headers);
 
-        $responseData = $this->getResponse((string) $response->getBody());
+        if (!isset($response['token'])) {
+            throw new Exception(
+                sprintf(
+                    'Unable to authenticate using apiClientId=%s, ApiClientSecret=%',
+                    $this->apiClientId,
+                    $this->apiClientSecret
+                )
+            );
+        }
 
-        $this->apiToken = $responseData['token'];
+        $this->apiToken = $response['token'];
 
         return $this;
     }
@@ -149,7 +216,7 @@ class SmsPortalClient
         $message,
         $from = null
     ) {
-        $request = [
+        $payload = [
             'messages' => [
                 [
                     'destination' => $to,
@@ -165,52 +232,12 @@ class SmsPortalClient
         }
 
         if (count($sendOptions) > 0) {
-            $request['SendOptions'] = $sendOptions;
+            $payload['SendOptions'] = $sendOptions;
         }
 
-        return $this->sendRequest($request);
-    }
-
-    /**
-     * Submit API request to send SMS
-     *
-     * @link https://docs.smsportal.com/reference#bulkmessages
-     * @param array $request
-     * @return array
-     * @throws Exception
-     */
-    protected function sendRequest(array $request)
-    {
-        $response = $this->authorize()->client->request(static::HTTP_POST, $this->baseRestUri . 'BulkMessages', [
-            'json' => $request,
-            'http_errors' => false,
-            'headers' => ['Authorization' => 'Bearer ' . $this->apiToken]
-        ]);
-
-        $response = $this->getResponse((string) $response->getBody());
-
-        if (isset($response['statusCode']) && $response['statusCode'] !== 200) {
-            $errorMessage = 'Error sending SMS message';
-            if (isset($response['errors'])) {
-                $errorMessage = json_encode($response['errors']);
-            } elseif (isset($response['ErrorReport']['Faults'])) {
-                $errorMessage = json_encode($response['ErrorReport']['Faults']);
-            }
-
-            throw new \Exception($errorMessage);
-        }
-
-        return $response;
-    }
-
-    /**
-     * Transform response string to responseData
-     *
-     * @param string $responseBody
-     * @return array
-     */
-    private function getResponse(string $responseBody): array
-    {
-        return json_decode($responseBody, true);
+        return $this->post(
+            'BulkMessages',
+            $payload
+        );
     }
 }
