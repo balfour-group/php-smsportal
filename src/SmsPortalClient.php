@@ -9,16 +9,6 @@ use GuzzleHttp\Psr7\Request;
 class SmsPortalClient
 {
     /**
-     * @var string
-     */
-    const HTTP_GET = 'GET';
-
-    /**
-     * @var string
-     */
-    const HTTP_POST = 'POST';
-
-    /**
      * @var Client
      */
     protected $client;

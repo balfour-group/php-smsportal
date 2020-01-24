@@ -4,6 +4,7 @@ namespace Tests;
 
 use Balfour\SmsPortal\SmsPortalClient;
 use GuzzleHttp\Client;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class SmsPortalClientTest extends TestCase
@@ -46,16 +47,25 @@ class SmsPortalClientTest extends TestCase
 
     public function testSendMessage()
     {
-        $client = new SmsPortalClient(
-            new Client,
-            '8f272f09-7cd6-4c0a-b352-1513f7491764',
-            '47CHNduGxoDKslW1opwFDwqGBFBPrCqL'
-        );
+        $guzzleClient = Mockery::mock(Client::class);
+        $client = Mockery::mock(SmsPortalClient::class . '[post]', [$guzzleClient]);
 
-        $resp = $client->sendMessage(
-            '+27610624165',
-            'Hello this is my message'
-        );
+        $client->shouldReceive('post')
+            ->withArgs([
+                'BulkMessages',
+                [
+                    'messages' => [
+                        [
+                            'destination' => '+27000000000',
+                            'content' => 'This is my message',
+                        ]
+                    ]
+                ]
+            ])
+            ->andReturn(['cost' => 1])
+            ->once();
+
+        $resp = $client->sendMessage('+27000000000', 'This is my message');
 
         $this->assertEquals(1, $resp['cost']);
     }
