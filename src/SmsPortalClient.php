@@ -202,9 +202,9 @@ class SmsPortalClient
      * @throws Exception
      */
     public function sendMessage(
-        $to,
-        $message,
-        $from = null
+        string $to,
+        string $message,
+        string $from = null
     ) {
         $payload = [
             'messages' => [
