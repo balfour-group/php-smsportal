@@ -212,7 +212,7 @@ class SmsPortalClient
     }
 
     /**
-     * @return array
+     * @return mixed[]
      */
     protected function getDefaultRequestOptions()
     {
@@ -225,8 +225,8 @@ class SmsPortalClient
     /**
      * @param string $method
      * @param string $endpoint
-     * @param array $params
-     * @param array|null $payload
+     * @param mixed[] $params
+     * @param mixed[]|null $payload
      * @return Request
      */
     protected function createRequest(
