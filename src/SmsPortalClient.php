@@ -154,6 +154,14 @@ class SmsPortalClient
     }
 
     /**
+     * @return mixed[]|null
+     */
+    public function getAPIToken(): ?array
+    {
+        return $this->apiToken;
+    }
+
+    /**
      * @param string $endpoint
      * @param mixed[] $params
      * @return string

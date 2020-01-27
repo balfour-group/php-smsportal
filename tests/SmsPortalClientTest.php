@@ -7,6 +7,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use Mockery;
 use PHPUnit\Framework\TestCase;
+use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -374,5 +375,299 @@ class SmsPortalClientTest extends TestCase
 
         $data = $client->sendMessage('+27000000000', 'This is a test message.', '+27111111111');
         $this->assertEquals(['hello' => 'world'], $data);
+    }
+
+    public function testAuthorizeUsesAPITokenFromClass()
+    {
+        $mockAPIToken = [
+            'token' => 'my_api_token',
+            'schema' => 'JWT',
+            'expiresInMinutes' => 1440,
+            'expiresAt' => time() + 1440,
+        ];
+
+        $guzzle = Mockery::mock(Client::class);
+        $client = new SmsPortalClient($guzzle, null, '123', 'secret');
+        $this->assertNull($client->getAPIToken());
+
+        $client->setAPIToken($mockAPIToken);
+
+        $client->authorize();
+
+        $this->assertEquals($mockAPIToken, $client->getAPIToken());
+    }
+
+    public function testAuthorizeUsesCacheWhenClassHasNoAPITokenSet()
+    {
+        $mockAPIToken = [
+            'token' => 'my_api_token',
+            'schema' => 'JWT',
+            'expiresInMinutes' => 1440,
+            'expiresAt' => time() + 1440,
+        ];
+
+        $guzzle = Mockery::mock(Client::class);
+
+        $item = Mockery::mock(CacheItemInterface::class);
+        $item->shouldReceive('isHit')
+            ->andReturnTrue()
+            ->once();
+        $item->shouldReceive('get')
+            ->andReturn($mockAPIToken)
+            ->once();
+
+        $cache = Mockery::mock(CacheItemPoolInterface::class);
+        $cache->shouldReceive('getItem')
+            ->with('smsportal_auth_token')
+            ->andReturn($item)
+            ->once();
+
+        $client = new SmsPortalClient($guzzle, $cache, '123', 'secret');
+        $this->assertNull($client->getAPIToken());
+
+        $client->authorize();
+
+        $this->assertEquals($mockAPIToken, $client->getAPIToken());
+    }
+
+    public function testAuthorizeUsesCacheWhenClassAPITokenIsExpired()
+    {
+        $expiredAPIToken = [
+            'token' => 'my_expired_api_token',
+            'schema' => 'JWT',
+            'expiresInMinutes' => 1440,
+            'expiresAt' => time() - 1,
+        ];
+
+        $mockAPIToken = [
+            'token' => 'my_api_token',
+            'schema' => 'JWT',
+            'expiresInMinutes' => 1440,
+            'expiresAt' => time() + 1440,
+        ];
+
+        $guzzle = Mockery::mock(Client::class);
+
+        $item = Mockery::mock(CacheItemInterface::class);
+        $item->shouldReceive('isHit')
+            ->andReturnTrue()
+            ->once();
+        $item->shouldReceive('get')
+            ->andReturn($mockAPIToken)
+            ->once();
+
+        $cache = Mockery::mock(CacheItemPoolInterface::class);
+        $cache->shouldReceive('getItem')
+            ->with('smsportal_auth_token')
+            ->andReturn($item)
+            ->once();
+
+        $client = new SmsPortalClient($guzzle, $cache, '123', 'secret');
+        $this->assertNull($client->getAPIToken());
+
+        $client->setAPIToken($expiredAPIToken);
+        $this->assertEquals($expiredAPIToken, $client->getAPIToken());
+
+        $client->authorize();
+
+        $this->assertEquals($mockAPIToken, $client->getAPIToken());
+    }
+
+    public function testAuthorizeUsesAPIWhenCacheMiss()
+    {
+        $response = Mockery::mock(ResponseInterface::class);
+        $response->shouldReceive('getBody')
+            ->andReturn('{"token":"my_api_token","schema":"JWT","expiresInMinutes":1440}');
+
+        $guzzle = Mockery::mock(Client::class);
+        $guzzle->shouldReceive('send')
+            ->withArgs([
+                Mockery::on(function ($argument) {
+                    return $argument instanceof RequestInterface
+                        && $argument->getMethod() === 'GET'
+                        && (string) $argument->getUri() === 'https://rest.smsportal.com/v1/Authentication'
+                        && $argument->getHeaderLine('Accept') === 'application/json'
+                        && $argument->getHeaderLine('Content-Type') === 'application/json';
+                }),
+                [
+                    'auth' => [
+                        '123',
+                        'secret',
+                    ],
+                    'connect_timeout' => 2000,
+                    'timeout' => 6000,
+                ]
+            ])
+            ->andReturn($response);
+
+        $item = Mockery::mock(CacheItemInterface::class);
+        $item->shouldReceive('isHit')
+            ->andReturnFalse()
+            ->once();
+        $item->shouldReceive('expiresAfter')
+            ->with(1440)
+            ->once();
+        $item->shouldReceive('set')
+            ->with(Mockery::on(function ($argument) {
+                return is_array($argument)
+                    && isset(
+                        $argument['token'],
+                        $argument['schema'],
+                        $argument['expiresInMinutes'],
+                        $argument['expiresAt']
+                    )
+                    && $argument['token'] === 'my_api_token'
+                    && $argument['schema'] === 'JWT'
+                    && $argument['expiresInMinutes'] === 1440;
+            }))
+            ->once();
+
+        $cache = Mockery::mock(CacheItemPoolInterface::class);
+        $cache->shouldReceive('getItem')
+            ->with('smsportal_auth_token')
+            ->andReturn($item)
+            ->once();
+        $cache->shouldReceive('save')
+            ->with($item)
+            ->once();
+
+        $client = new SmsPortalClient($guzzle, $cache, '123', 'secret');
+        $this->assertNull($client->getAPIToken());
+
+        $client->authorize();
+
+        $apiToken = $client->getAPIToken();
+        $this->assertArrayHasKey('token', $apiToken);
+        $this->assertArrayHasKey('schema', $apiToken);
+        $this->assertArrayHasKey('expiresInMinutes', $apiToken);
+        $this->assertArrayHasKey('expiresAt', $apiToken);
+        $this->assertEquals('my_api_token', $apiToken['token']);
+        $this->assertEquals('JWT', $apiToken['schema']);
+        $this->assertEquals(1440, $apiToken['expiresInMinutes']);
+    }
+
+    public function testAuthorizeUsesAPIWhenClassHasNoAPITokenSetAndNoCacheStoreIsPresent()
+    {
+        $response = Mockery::mock(ResponseInterface::class);
+        $response->shouldReceive('getBody')
+            ->andReturn('{"token":"my_api_token","schema":"JWT","expiresInMinutes":1440}');
+
+        $guzzle = Mockery::mock(Client::class);
+        $guzzle->shouldReceive('send')
+            ->withArgs([
+                Mockery::on(function ($argument) {
+                    return $argument instanceof RequestInterface
+                        && $argument->getMethod() === 'GET'
+                        && (string) $argument->getUri() === 'https://rest.smsportal.com/v1/Authentication'
+                        && $argument->getHeaderLine('Accept') === 'application/json'
+                        && $argument->getHeaderLine('Content-Type') === 'application/json';
+                }),
+                [
+                    'auth' => [
+                        '123',
+                        'secret',
+                    ],
+                    'connect_timeout' => 2000,
+                    'timeout' => 6000,
+                ]
+            ])
+            ->andReturn($response);
+
+        $client = new SmsPortalClient($guzzle, null, '123', 'secret');
+        $this->assertNull($client->getAPIToken());
+
+        $client->authorize();
+
+        $apiToken = $client->getAPIToken();
+        $this->assertArrayHasKey('token', $apiToken);
+        $this->assertArrayHasKey('schema', $apiToken);
+        $this->assertArrayHasKey('expiresInMinutes', $apiToken);
+        $this->assertArrayHasKey('expiresAt', $apiToken);
+        $this->assertEquals('my_api_token', $apiToken['token']);
+        $this->assertEquals('JWT', $apiToken['schema']);
+        $this->assertEquals(1440, $apiToken['expiresInMinutes']);
+    }
+
+    public function testAuthorizeUsesAPIWhenCachedTokenIsExpired()
+    {
+        $expiredAPIToken = [
+            'token' => 'my_expired_api_token',
+            'schema' => 'JWT',
+            'expiresInMinutes' => 1440,
+            'expiresAt' => time() - 1,
+        ];
+
+        $response = Mockery::mock(ResponseInterface::class);
+        $response->shouldReceive('getBody')
+            ->andReturn('{"token":"my_api_token","schema":"JWT","expiresInMinutes":1440}');
+
+        $guzzle = Mockery::mock(Client::class);
+        $guzzle->shouldReceive('send')
+            ->withArgs([
+                Mockery::on(function ($argument) {
+                    return $argument instanceof RequestInterface
+                        && $argument->getMethod() === 'GET'
+                        && (string) $argument->getUri() === 'https://rest.smsportal.com/v1/Authentication'
+                        && $argument->getHeaderLine('Accept') === 'application/json'
+                        && $argument->getHeaderLine('Content-Type') === 'application/json';
+                }),
+                [
+                    'auth' => [
+                        '123',
+                        'secret',
+                    ],
+                    'connect_timeout' => 2000,
+                    'timeout' => 6000,
+                ]
+            ])
+            ->andReturn($response);
+
+        $item = Mockery::mock(CacheItemInterface::class);
+        $item->shouldReceive('isHit')
+            ->andReturnTrue()
+            ->once();
+        $item->shouldReceive('get')
+            ->andReturn($expiredAPIToken)
+            ->once();
+        $item->shouldReceive('expiresAfter')
+            ->with(1440)
+            ->once();
+        $item->shouldReceive('set')
+            ->with(Mockery::on(function ($argument) {
+                return is_array($argument)
+                    && isset(
+                        $argument['token'],
+                        $argument['schema'],
+                        $argument['expiresInMinutes'],
+                        $argument['expiresAt']
+                    )
+                    && $argument['token'] === 'my_api_token'
+                    && $argument['schema'] === 'JWT'
+                    && $argument['expiresInMinutes'] === 1440;
+            }))
+            ->once();
+
+        $cache = Mockery::mock(CacheItemPoolInterface::class);
+        $cache->shouldReceive('getItem')
+            ->with('smsportal_auth_token')
+            ->andReturn($item)
+            ->once();
+        $cache->shouldReceive('save')
+            ->with($item)
+            ->once();
+
+        $client = new SmsPortalClient($guzzle, $cache, '123', 'secret');
+        $this->assertNull($client->getAPIToken());
+
+        $client->authorize();
+
+        $apiToken = $client->getAPIToken();
+        $this->assertArrayHasKey('token', $apiToken);
+        $this->assertArrayHasKey('schema', $apiToken);
+        $this->assertArrayHasKey('expiresInMinutes', $apiToken);
+        $this->assertArrayHasKey('expiresAt', $apiToken);
+        $this->assertEquals('my_api_token', $apiToken['token']);
+        $this->assertEquals('JWT', $apiToken['schema']);
+        $this->assertEquals(1440, $apiToken['expiresInMinutes']);
     }
 }
