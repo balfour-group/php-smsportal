@@ -1,38 +1,38 @@
 {
-  "name": "balfour/php-smsportal",
-  "description": "An API client for sending SMSs via the SmsPortal API",
-  "type": "library",
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Balfour",
-      "email": "team-dev@balfourgroup.com"
-    }
-  ],
-  "require": {
-    "ext-json": "*",
-    "guzzlehttp/guzzle": "^6.3",
-    "psr/cache": "^1.0"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "^5.7",
-    "mockery/mockery": "^1.0"
-  },
-  "autoload": {
-    "psr-4": {
-      "Balfour\\SmsPortal\\": "src/",
-      "Tests\\": "tests/"
-    }
-  },
-  "extra": {
-    "branch-alias": {
-      "dev-master": "1.0-dev"
-    }
-  },
-  "config": {
-    "preferred-install": "dist",
-    "sort-packages": true
-  },
-  "minimum-stability": "dev",
-  "prefer-stable": true
+    "name": "balfour/php-smsportal",
+    "description": "An API client for sending SMSs via the SmsPortal API",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Balfour",
+            "email": "team-dev@balfourgroup.com"
+        }
+    ],
+    "require": {
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^6.3",
+        "psr/cache": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.7",
+        "mockery/mockery": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Balfour\\SmsPortal\\": "src/",
+            "Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
