@@ -1,6 +1,6 @@
 # php-smsportal
 
-An API client for sending SMS via the [SmsPortal](https://smsportal.com/) API
+An API client for sending SMS via the [SmsPortal](https://smsportal.com/) API.
 
 ## Installation
 
@@ -8,18 +8,18 @@ An API client for sending SMS via the [SmsPortal](https://smsportal.com/) API
 composer require balfour/php-smsportal
 ```
 
-## PHPUnit
-
-```bash
-phpunit Tests
-```
-
 ## Usage
 
 ```php
-$client = new \Balfour\SmsPortal\SmsPortalClient(
-    'api_client_id',
-    'api_client_secret'
+use Balfour\SmsPortal\SmsPortalClient;
+use GuzzleHttp\Client;
+
+$guzzle = new Client();
+$client = new SmsPortalClient(
+    $guzzle,
+    null, // PSR-6 CacheItemPoolInterface
+    '[your client id]',
+    '[your secret]'
 );
 
 $resp = $client->sendMessage(
@@ -27,3 +27,6 @@ $resp = $client->sendMessage(
     'This is a test message.'
 );
 ```
+
+If you pass an implementation of a PSR-6 CacheItemPoolInterface, the authentication token will be cached and used
+for subsequent requests.

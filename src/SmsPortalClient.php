@@ -5,6 +5,8 @@ namespace Balfour\SmsPortal;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
+use Psr\Cache\CacheItemInterface;
+use Psr\Cache\CacheItemPoolInterface;
 
 class SmsPortalClient
 {
@@ -14,104 +16,149 @@ class SmsPortalClient
     protected $client;
 
     /**
-     * @var string
+     * @var CacheItemPoolInterface|null
      */
-    protected $uri;
+    protected $cache;
 
     /**
      * @var string
      */
-    protected $apiClientId;
+    protected $uri = 'https://rest.smsportal.com/v1/';
 
     /**
      * @var string
      */
-    protected $apiClientSecret;
+    protected $clientID;
 
     /**
      * @var string
+     */
+    protected $secret;
+
+    /**
+     * @var mixed[]
      */
     protected $apiToken;
 
     /**
      * @param Client $client
-     * @param string|null $apiClientId
-     * @param string|null $apiClientSecret
+     * @param CacheItemPoolInterface|null $cache
+     * @param string|null $clientID
+     * @param string|null $secret
      */
-    public function __construct(Client $client, ?string $apiClientId = null, ?string $apiClientSecret = null)
-    {
+    public function __construct(
+        Client $client,
+        ?CacheItemPoolInterface $cache,
+        ?string $clientID = null,
+        ?string $secret = null
+    ) {
         $this->client = $client;
-        $this->uri = 'https://rest.smsportal.com/v1/';
-        $this->apiClientId = $apiClientId;
-        $this->apiClientSecret = $apiClientSecret;
+        $this->cache = $cache;
+        $this->clientID = $clientID;
+        $this->secret = $secret;
     }
 
     /**
-     * Set the base REST Uri
-     *
+     * @return Client
+     */
+    public function getClient(): Client
+    {
+        return $this->client;
+    }
+
+    /**
+     * @param CacheItemPoolInterface $cache
+     * @return $this
+     */
+    public function setCache(CacheItemPoolInterface $cache)
+    {
+        $this->cache = $cache;
+
+        return $this;
+    }
+
+    /**
+     * @return CacheItemPoolInterface|null
+     */
+    public function getCache(): ?CacheItemPoolInterface
+    {
+        return $this->cache;
+    }
+
+    /**
      * @param string $uri
+     * @return $this
      */
     public function setUri(string $uri)
     {
         $this->uri = $uri;
+
+        return $this;
     }
 
     /**
-     * Return base REST Uri
-     *
      * @return string
      */
-    public function getUri()
+    public function getUri(): string
     {
         return $this->uri;
     }
 
     /**
-     * Set the api client id
-     *
-     * @param string $apiClientId
+     * @param string $clientID
+     * @return $this
      */
-    public function setApiClientId(string $apiClientId)
+    public function setClientID(string $clientID)
     {
-        $this->apiClientId = $apiClientId;
+        $this->clientID = $clientID;
+
+        return $this;
     }
 
     /**
-     * Return the api client id
-     *
      * @return string
      */
-    public function getApiClientId()
+    public function getClientID(): string
     {
-        return $this->apiClientId;
+        return $this->clientID;
     }
 
     /**
-     * Set the api client secret
-     *
-     * @param string $apiClientSecret
+     * @param string $secret
+     * @return $this
      */
-    public function setApiClientSecret(string $apiClientSecret)
+    public function setSecret(string $secret)
     {
-        $this->apiClientSecret = $apiClientSecret;
+        $this->secret = $secret;
+
+        return $this;
     }
 
     /**
-     * Return the api client secret
-     *
      * @return string
      */
-    public function getApiClientSecret()
+    public function getSecret(): string
     {
-        return $this->apiClientSecret;
+        return $this->secret;
+    }
+
+    /**
+     * @param mixed[] $apiToken
+     * @return $this
+     */
+    public function setAPIToken(array $apiToken)
+    {
+        $this->apiToken = $apiToken;
+
+        return $this;
     }
 
     /**
      * @param string $endpoint
-     * @param array $params
+     * @param mixed[] $params
      * @return string
      */
-    protected function getBaseUri($endpoint, array $params = [])
+    protected function getBaseUri($endpoint, array $params = []): string
     {
         $uri = $this->uri;
         $uri = rtrim($uri, '/');
@@ -126,85 +173,199 @@ class SmsPortalClient
 
     /**
      * @param string $endpoint
-     * @param array $params
-     * @param array $headers
-     * @return array
+     * @param mixed[] $params
+     * @return mixed[]
+     * @throws Exception
+     * @throws \Psr\Cache\InvalidArgumentException
      */
-    public function get($endpoint, array $params = [], $headers = [])
+    public function get(string $endpoint, array $params = []): array
     {
-        $request = new Request(
-            'GET',
-            $this->getBaseUri($endpoint, $params),
-            $headers
-        );
+        $this->authorize();
+
+        $request = $this->createRequest('GET', $endpoint, $params);
 
         return $this->sendRequest($request);
     }
 
     /**
      * @param string $endpoint
-     * @param array $payload
-     * @param array $headers
-     * @return array
+     * @param mixed[] $payload
+     * @return mixed[]
      * @throws Exception
+     * @throws \Psr\Cache\InvalidArgumentException
      */
-    public function post($endpoint, array $payload = [])
+    public function post(string $endpoint, array $payload = []): array
     {
-        if ($this->apiToken === null) {
-            echo 'doing authorize()';
-            $this->authorize();
-        }
+        $this->authorize();
 
-        $request = new Request(
-            'POST',
-            $this->getBaseUri($endpoint),
-            ['Authorization' => 'Bearer ' . $this->apiToken]
-        );
+        $request = $this->createRequest('POST', $endpoint, [], $payload);
 
-        return $this->sendRequest($request, ['json' => $payload]);
-    }
-
-    protected function sendRequest(Request $request, $options = [])
-    {
-        $response = $this->client->send($request, $options);
-        $body = (string) $response->getBody();
-
-        return json_decode($body, true);
-    }
-
-    public function authorize()
-    {
-        $headers = ['Authorization' => 'Basic ' . base64_encode($this->apiClientId . ':' . $this->apiClientSecret)];
-        $response = $this->get('Authentication', [], $headers);
-
-        if (!isset($response['token'])) {
-            throw new Exception(
-                sprintf(
-                    'Unable to authenticate using apiClientId=%s, ApiClientSecret=%',
-                    $this->apiClientId,
-                    $this->apiClientSecret
-                )
-            );
-        }
-
-        $this->apiToken = $response['token'];
-
-        return $this;
+        return $this->sendRequest($request);
     }
 
     /**
-     * Send an SMS
-     *
+     * @return array
+     */
+    protected function getDefaultRequestOptions()
+    {
+        return [
+            'connect_timeout' => 2000,
+            'timeout' => 6000,
+        ];
+    }
+
+    /**
+     * @param string $method
+     * @param string $endpoint
+     * @param array $params
+     * @param array|null $payload
+     * @return Request
+     */
+    protected function createRequest(
+        string $method,
+        string $endpoint,
+        array $params = [],
+        ?array $payload = null
+    ): Request {
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+
+        if ($this->apiToken) {
+            $headers['Authorization'] = sprintf('Bearer %s', $this->apiToken['token']);
+        }
+
+        $body = $payload ? json_encode($payload) : null;
+
+        return new Request(
+            $method,
+            $this->getBaseUri($endpoint, $params),
+            $headers,
+            $body
+        );
+    }
+
+    /**
+     * @param Request $request
+     * @return mixed[]
+     */
+    protected function sendRequest(Request $request): array
+    {
+        $response = $this->client->send($request, $this->getDefaultRequestOptions());
+        $body = (string) $response->getBody();
+        return json_decode($body, true);
+    }
+
+    /**
+     * @return mixed[]
+     */
+    public function getAuthorizationToken(): array
+    {
+        $request = new Request(
+            'GET',
+            $this->getBaseUri('Authentication'),
+            [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ]
+        );
+
+        $options = array_merge(
+            [
+                'auth' => [
+                    $this->clientID,
+                    $this->secret,
+                ],
+            ],
+            $this->getDefaultRequestOptions()
+        );
+
+        $response = $this->client->send($request, $options);
+
+        $body = (string) $response->getBody();
+        $token = json_decode($body, true);
+        $token['expiresAt'] = time() + $token['expiresInMinutes'];
+
+        return $token;
+    }
+
+    /**
+     * @throws \Psr\Cache\InvalidArgumentException
+     */
+    public function authorize(): void
+    {
+        // we first try retrieve a token from the class instance
+        // if nothing, we look at our cache
+        // finally, we generate one using our client id and secret by doing an authentication call to the api
+
+        $this->apiToken = $this->getAPITokenFromClassInstance(function (): array {
+            return $this->getAPITokenFromCache(function (?CacheItemPoolInterface $cache, ?CacheItemInterface $item): array {
+                $apiToken = $this->getAuthorizationToken();
+
+                if ($cache && $item) {
+                    $item->expiresAfter($apiToken['expiresInMinutes']);
+                    $item->set($apiToken);
+
+                    $cache->save($item);
+                }
+
+                return $apiToken;
+            });
+        });
+    }
+
+    /**
+     * @param callable|null $default
+     * @return mixed[]|null
+     */
+    protected function getAPITokenFromClassInstance(?callable $default = null): ?array
+    {
+        if ($this->apiToken) {
+            if ($this->apiToken['expiresAt'] > time()) {
+                return $this->apiToken;
+            }
+        }
+
+        return $default ? call_user_func($default) : null;
+    }
+
+    /**
+     * @param callable|null $default
+     * @return mixed[]|null
+     * @throws \Psr\Cache\InvalidArgumentException
+     */
+    protected function getAPITokenFromCache(?callable $default = null): ?array
+    {
+        $item = null;
+
+        if ($this->cache) {
+            $item = $this->cache->getItem('smsportal_auth_token');
+
+            if ($item->isHit()) {
+                $apiToken = $item->get();
+
+                if ($apiToken['expiresAt'] > time()) {
+                    return $apiToken;
+                }
+            }
+        }
+
+        return $default ? call_user_func($default, $this->cache, $item) : null;
+    }
+
+    /**
      * @param string $to
      * @param string $message
      * @param string|null $from
-     * @return mixed
+     * @return mixed[]
      * @throws Exception
+     * @throws \Psr\Cache\InvalidArgumentException
      */
     public function sendMessage(
         string $to,
         string $message,
-        string $from = null
+        ?string $from = null
     ) {
         $payload = [
             'messages' => [
@@ -225,9 +386,6 @@ class SmsPortalClient
             $payload['SendOptions'] = $sendOptions;
         }
 
-        return $this->post(
-            'BulkMessages',
-            $payload
-        );
+        return $this->post('BulkMessages', $payload);
     }
 }
