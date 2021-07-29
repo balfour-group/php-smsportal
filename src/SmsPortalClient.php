@@ -384,7 +384,9 @@ class SmsPortalClient
             ]
         ];
 
-        $sendOptions = [];
+        $sendOptions = [
+            'checkOptOuts' => true,
+        ];
 
         if ($from) {
             $sendOptions['senderId'] = $from;
